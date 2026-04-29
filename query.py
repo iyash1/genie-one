@@ -14,7 +14,7 @@ db = Chroma(
 )
 
 # Load LLM
-llm = Ollama(model="llama3")
+llm = Ollama(model="llama3", base_url="http://ollama:11434")
 
 # Query loop
 while True:
