@@ -1,5 +1,7 @@
 # Genie One — Local RAG App 🧠📚
 
+> This requires a huge amount of disk, approximately 12GB ~ 15GB
+
 A simple local Retrieval-Augmented Generation (RAG) demo that:
 - ingests PDFs (and TXT) into a Chroma vector DB
 - creates embeddings with HuggingFace sentence-transformers
