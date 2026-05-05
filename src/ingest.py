@@ -1,13 +1,9 @@
-from langchain_community.document_loaders import PyPDFLoader
+import os
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
 
-import os
-
-DOCS_PATH = "docs"
-DB_PATH = "db"
+from src.db import store_db
+from src.constants import DEFAULT_EMBEDDING_MODEL, DB_PATH, DOCS_PATH, CHUNK_SIZE_500, CHUNK_OVERLAP_100
 
 def load_documents():
     documents = []
@@ -30,23 +26,12 @@ def ingest():
     documents = load_documents()
 
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=100
+        chunk_size=CHUNK_SIZE_500,
+        chunk_overlap=CHUNK_OVERLAP_100
     )
 
     docs = text_splitter.split_documents(documents)
-
-    embedding = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
-    db = Chroma.from_documents(
-        docs,
-        embedding,
-        persist_directory=DB_PATH
-    )
-
-    db.persist()
+    store_db(docs)
 
     return f"Ingested {len(docs)} chunks."
 

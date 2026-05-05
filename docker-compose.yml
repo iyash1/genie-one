@@ -5,23 +5,24 @@ services:
     ports:
       - "7860:7860"
     volumes:
-      - .:/app
-      - ./db:/app/db
-      - ./docs:/app/docs
+      - rag_docs:/app/storage/docs
+      - rag_db:/app/storage/db
     depends_on:
       - ollama
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama
     container_name: ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    command: >
-      sh -c "ollama serve & sleep 5 && ollama list | grep llama3 || ollama pull llama3 && wait"
+    command: ["serve"]
+    restart: unless-stopped
 
 volumes:
+  rag_docs:
+  rag_db:
   ollama_data:

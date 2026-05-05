@@ -1,0 +1,33 @@
+from langchain_community.vectorstores import Chroma
+from src.embedding import embedding
+from src.constants import DB_PATH, DOCS_PATH, DEFAULT_EMBEDDING_MODEL  # Vector database for embeddings
+
+# ========== DATABASE LOADER ==========
+def load_db(db_path=DB_PATH, embedding_model=DEFAULT_EMBEDDING_MODEL):
+    """
+    Load and initialize the Chroma vector database.
+    Returns a Chroma instance connected to the persisted database.
+    """
+    return Chroma(
+        persist_directory=db_path,
+        embedding_function=embedding(embedding_model) # Uses MiniLM-L6-v2: lightweight but effective for semantic similarity
+    )
+
+def store_db(docs, embedding_model=DEFAULT_EMBEDDING_MODEL, db_path=DB_PATH):
+    """
+    Persist the Chroma vector database to disk.
+    Ensures that all embeddings and indexed documents are saved for future retrieval.
+    """
+    if docs is None or len(docs) == 0:
+        print("No documents to store in the database.")
+        return
+    
+    print(f"Using {embedding_model} for embeddings...")
+    db = Chroma.from_documents(
+        docs,
+        embedding(embedding_model),
+        persist_directory=db_path
+    )
+
+    db.persist()
+    print(f"Database stored at {db_path} with {len(docs)} documents.")

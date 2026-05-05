@@ -30,5 +30,5 @@ COPY . .
 # Expose Streamlit port
 EXPOSE 7860
 
-# Run app
-CMD ["python", "app.py"]
+# Ensure module-based execution so `src` package imports resolve
+CMD ["python", "-m", "src.app"]
