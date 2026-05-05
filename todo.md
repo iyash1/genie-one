@@ -9,4 +9,4 @@
  8. [ ] Ingestion progress bar
  9. [ ] Evals
  10. [ ] Wipe everything clean and to build a fresh knowledge repo
- 11. [ ] Restructure the code for reusability and readbility
+ 11. [x] Restructure the code for reusability and readbility
