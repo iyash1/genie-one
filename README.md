@@ -28,17 +28,32 @@ A simple local Retrieval-Augmented Generation (RAG) demo that:
 ```
 genie-one/
 ├─ README.md
-├─ ingest.py            # PDF/TXT ingestion -> chunking -> embeddings
-├─ query.py             # CLI query tool
-├─ app.py               # Gradio web UI
 ├─ Dockerfile
 ├─ docker-compose.yml
-├─ docs/                # Add your PDFs/TXT here (gitignored)
-├─ db/                  # Chroma persist directory (generated)
-├─ scripts/
-│  └─ reset.sh          # wipe db, stop containers, prune docker
-├─ tests/               # unit / integration tests
-└─ .gitignore
+├─ .gitignore
+│
+├─ Core Scripts
+│  ├─ ingest.py            # PDF/TXT ingestion -> chunking -> embeddings
+│  ├─ query.py             # CLI query tool
+│  └─ app.py               # Gradio web UI
+│
+├─ Configuration & Data
+│  ├─ docs/                # Add your PDFs/TXT here (gitignored)
+│  ├─ db/                  # Chroma persist directory (generated, gitignored)
+│  └─ storage/             # Optional: alternative data storage location
+│
+├─ Scripts & Utilities
+│  ├─ scripts/
+│  │  └─ reset.sh          # wipe db, stop containers, prune docker
+│  └─ utils/               # Utility functions & helpers
+│
+├─ Testing & Documentation
+│  ├─ tests/               # unit / integration tests
+│  ├─ design/              # design docs & flowcharts
+│  └─ examples/            # example usage & notebooks
+│
+└─ Dependencies
+   └─ requirements.txt     # Python package dependencies (if present)
 ```
 
 ---
@@ -82,6 +97,8 @@ This repo includes a docker-compose.yml that starts both the app and an Ollama c
 1. Build & start
 ```bash
 docker compose up --build
+docker exec -it ollama ollama pull llama3
+docker exec -it ollama ollama list
 ```
 
 2. App will be available at http://localhost:7860 (Gradio)

@@ -66,7 +66,7 @@ def chat_fn(message, history):
 
 
 # ========== FILE UPLOAD FUNCTION ========
-def upload_and_ingest(files):
+def upload_and_ingest(files, progress=gr.Progress()):
     """
     Handle file upload and trigger ingestion into vector database.
     Copies uploaded files to docs directory and processes them into embeddings.
@@ -94,8 +94,12 @@ def upload_and_ingest(files):
         # Record filename
         saved_files.append(filename)
 
+    # Progress-aware ingestion
+    def update_progress(p, msg):
+        progress(p, desc=msg)
+    
     # Trigger ingestion process to embed documents into vector store
-    result = ingest()
+    result = ingest(progress_callback=update_progress)
 
     return f"Uploaded: {saved_files}\n\n{result}"
 
