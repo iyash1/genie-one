@@ -70,7 +70,7 @@ genie-one/
 
 1. Clone the repo
 ```bash
-git clone <repo-url>
+git clone https://github.com/iyash1/genie-one.git
 cd genie-one
 ```
 
