@@ -38,6 +38,7 @@ def chat_fn(message, history):
     Returns:
         tuple: Updated (history, history) for Gradio chatbot display
     """
+    print(f"RECEIVED MESSAGE: {message}")
     # Load vector database connection
     db = load_db()
 
@@ -110,6 +111,7 @@ def upload_and_ingest(files, progress=gr.Progress()):
 # Functions to view ingested documents files for debugging and transparency in the UI
 # Files can be uploaded but not ingested if they are in an unsupported format, so this helps users understand what data is available for retrieval
 def view_ingested_docs():
+    print("FETCHING INGESTED DOCUMENTS...")
     db = load_db()
     data = db.get()
 
@@ -123,6 +125,7 @@ def view_ingested_docs():
 
 # View uploaded files in the docs directory
 def view_uploaded_files():
+    print("FETCHING UPLOADED FILES...")
     files = os.listdir(DOCS_PATH)
     return "\n".join([f"{i+1}. {file}" for i, file in enumerate(files)])
 

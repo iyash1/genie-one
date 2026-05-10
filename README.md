@@ -147,7 +147,10 @@ Use with caution — it deletes local DB and prunes Docker resources.
 ```bash
 docker compose exec app ls /app/docs
 ```
-
+## Wipe the documents and database clean - Data reset
+```bash
+docker compose exec app sh scripts/reset.sh
+```
 ---
 
 ## Configuration & Customization ⚙️

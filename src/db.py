@@ -8,6 +8,8 @@ def load_db(db_path=DB_PATH, embedding_model=DEFAULT_EMBEDDING_MODEL):
     Load and initialize the Chroma vector database.
     Returns a Chroma instance connected to the persisted database.
     """
+    print(f"Loading database from {db_path}...")
+    print(f"Using {embedding_model} for embeddings...")
     return Chroma(
         persist_directory=db_path,
         embedding_function=embedding(embedding_model) # Uses MiniLM-L6-v2: lightweight but effective for semantic similarity
@@ -23,6 +25,7 @@ def store_db(docs, embedding_model=DEFAULT_EMBEDDING_MODEL, db_path=DB_PATH):
         print("No documents to store in the database.")
         return
     
+    print(f"Storing {len(docs)} documents in the database...")
     print(f"Using {embedding_model} for embeddings...")
     db = Chroma.from_documents(
         docs,
