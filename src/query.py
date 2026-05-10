@@ -15,23 +15,25 @@ llm = Ollama(model=LLAMA_MODEL, base_url=OLLAMA_LOCAL_URL)
 while True:
     # Prompt user to enter a question or type 'exit' to quit the program
     query = input("\nAsk a question (or 'exit'): ")
-    
-    # Check if user wants to exit the loop
-    if query == "exit":
+    if query.lower() == "exit":
         break
 
-    # Retrieve the top 3 most relevant documents from vector DB using semantic similarity
-    # The query is converted to embeddings and matched against stored document embeddings
-    docs = db.similarity_search(query, k=3)
+    docs = db.max_marginal_relevance_search(query, k=5, fetch_k=10)
 
-    # Combine the content of retrieved documents into a single context string
-    # Separated by double newlines for readability in the prompt
-    context = "\n\n".join([doc.page_content for doc in docs])
+    print("\nRetrieved sources:")
+    for d in docs:
+        print(d.metadata.get("source"))
 
-    # Construct the prompt for the LLM with the retrieved context and user query
-    # This ensures the model answers based only on provided context (RAG approach)
+    context = "\n\n".join([
+        f"Source: {doc.metadata.get('source')}\n{doc.page_content}"
+        for doc in docs
+    ])
+
     prompt = f"""
-    Answer the question based only on the context below.
+    You are answering using multiple documents.
+
+    Use ALL relevant information from the context.
+    Combine information from multiple sources when needed.
 
     Context:
     {context}
@@ -40,8 +42,11 @@ while True:
     {query}
     """
 
-    # Send the prompt to the Ollama LLM and get the response
     response = llm.invoke(prompt)
 
-    # Display the LLM's answer to the user
+    sources = set(d.metadata.get("source") for d in docs)
+
     print("\nAnswer:", response)
+    print("\nSources:")
+    for s in sources:
+        print("-", s)

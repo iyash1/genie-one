@@ -2,18 +2,36 @@ import os
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from src.db import store_db
-from src.constants import DOCS_PATH, CHUNK_SIZE_500, CHUNK_OVERLAP_100
+from src.db import load_db, store_db
+from src.constants import DOCS_PATH, CHUNK_SIZE_800, CHUNK_OVERLAP_150
 
-# Upload Function: Handles document loading
-def load_documents():
+# ---------- TEXT CLEANING ----------
+def clean_text(text: str) -> str:
+    if not text:
+        return ""
+
+    # Remove excessive whitespace, line breaks, weird spacing
+    text = text.replace("\n", " ")
+    text = text.replace("\r", " ")
+    text = " ".join(text.split())
+
+    return text
+
+
+# ---------- LOAD DOCUMENTS ----------
+def load_documents(file_list=None):
     documents = []
 
-    for filename in os.listdir(DOCS_PATH):
+    files = file_list if file_list else os.listdir(DOCS_PATH)
+
+    for filename in files:
         path = os.path.join(DOCS_PATH, filename)
 
-        # Support PDF and TXT files for ingestion; skip unsupported formats
-        # PDFs are loaded with PyPDFLoader, while text files are loaded with TextLoader (with fallback encoding)
+        if not os.path.exists(path):
+            continue
+
+        print(f"\nLoading file: {filename}")
+
         if filename.endswith(".pdf"):
             loader = PyPDFLoader(path)
             docs = loader.load()
@@ -29,40 +47,84 @@ def load_documents():
             continue
 
         for doc in docs:
+            # CLEAN TEXT (CRITICAL FIX)
+            doc.page_content = clean_text(doc.page_content)
+
+            # ✅ Attach metadata
             doc.metadata["source"] = filename
+
+        # 🔍 Debug PDF quality
+        if filename.endswith(".pdf") and docs:
+            print("\n--- PDF SAMPLE (first 300 chars) ---")
+            print(docs[0].page_content[:300])
+            print("-----------------------------------")
 
         documents.extend(docs)
 
     return documents
 
-# Ingest Function: Main function to  split and store uploaded documents in the vector database
-def ingest(progress_callback=None):
-    documents = load_documents()
 
-    # Progress bar for UI update
+# ---------- INGEST ----------
+def ingest_documents(documents, progress_callback=None):
     if progress_callback:
         progress_callback(0.2, "Loaded documents")
 
-    # Initialize text splitter
-    # uses overlap to maintain context across chunks
+    # ✅ Better chunking for PDFs
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE_500,
-        chunk_overlap=CHUNK_OVERLAP_100
+        chunk_size=CHUNK_SIZE_800,       
+        chunk_overlap=CHUNK_OVERLAP_150  
     )
 
-    # Split the documents using the text splitter
     docs = text_splitter.split_documents(documents)
+
+    print(f"\nTotal chunks before filtering: {len(docs)}")
+
+    docs = filter_existing_docs(docs)
+
+    print(f"Total chunks after filtering: {len(docs)}")
 
     if progress_callback:
         progress_callback(0.5, "Split into chunks")
-    
-    # Store the chunks in the vector database 
+
+    if not docs:
+        return "No new documents to ingest."
+
     store_db(docs)
+
     if progress_callback:
         progress_callback(1.0, "Ingestion complete")
 
     return f"Ingested {len(docs)} chunks."
 
 
+# ---------- FILTER EXISTING ----------
+def filter_existing_docs(docs):
+    try:
+        db = load_db()
+        data = db.get()
+
+        existing_sources = set(
+            meta["source"]
+            for meta in data["metadatas"]
+            if meta and "source" in meta
+        )
+
+        # Only skip if file already exists AND user is re-uploading same file
+        filtered = [
+            doc for doc in docs
+            if doc.metadata["source"] not in existing_sources
+        ]
+
+        if not filtered:
+            print("All documents already ingested. Skipping.")
+
+        return filtered
+
+    except Exception:
+        # If DB not initialized yet → ingest everything
+        return docs
+
+
 if __name__ == "__main__":
-    print(ingest())
+    docs = load_documents()
+    print(ingest_documents(docs))

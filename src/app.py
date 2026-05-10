@@ -1,115 +1,118 @@
 # ========== IMPORTS ==========
-# Gradio: Framework for building web interfaces for ML models
 import gradio as gr
-# OS and file operations: Path management and file utilities
 import os
 import shutil
 
-# LangChain Community: Tools for LLM integration and RAG (Retrieval-Augmented Generation)
-from langchain_community.llms import Ollama  # Local LLM via Ollama
+from langchain_community.llms import Ollama
 
-
-# Custom ingestion module: Handles document processing and vector store population
-from src.ingest import ingest
+from src.ingest import ingest_documents, load_documents
 from src.constants import DOCS_PATH, LLAMA_MODEL, OLLAMA_LOCAL_URL
-from src.db import load_db  # Function to load the Chroma vector database
+from src.db import load_db
 
 # Ensure docs directory exists
 os.makedirs(DOCS_PATH, exist_ok=True)
 
 # ========== LLM INITIALIZATION ==========
-# Initialize local Ollama LLM model
-# Connects to Ollama service running on Docker container
 llm = Ollama(
     model=LLAMA_MODEL,
     base_url=OLLAMA_LOCAL_URL
 )
 
-# ========== CHAT FUNCTION ========
+# ========== CHAT FUNCTION ==========
 def chat_fn(message, history):
-    """
-    Core RAG (Retrieval-Augmented Generation) chat function.
-    Retrieves relevant documents from vector store and generates context-aware responses.
-    
-    Args:
-        message (str): User's query
-        history (list): Chat history of previous messages and responses
-    
-    Returns:
-        tuple: Updated (history, history) for Gradio chatbot display
-    """
-    print(f"RECEIVED MESSAGE: {message}")
-    # Load vector database connection
+    print(f"\n=== RECEIVED MESSAGE: {message} ===")
+
     db = load_db()
 
-    # Retrieve top 3 most similar documents to the user's query
-    docs = db.similarity_search(message, k=3)
+    # ✅ Use MMR for better diversity across documents
+    docs = db.max_marginal_relevance_search(
+        message,
+        k=8,
+        fetch_k=25
+    )
 
-    # Combine retrieved documents into a single context string
-    context = "\n\n".join([doc.page_content for doc in docs])
+    # ✅ Remove weak chunks
+    docs = [d for d in docs if len(d.page_content) > 100]
 
-    # Construct prompt with instructions and context for the LLM
+    # ✅ Prioritize richer chunks
+    docs = sorted(docs, key=lambda x: len(x.page_content), reverse=True)
+
+    print("\n--- RETRIEVED DOCUMENTS ---")
+    for d in docs:
+        print("SOURCE:", d.metadata.get("source"))
+        print("TEXT:", d.page_content[:150])
+        print("-------------------------")
+
+    # ✅ Structured context with source separation
+    context = "\n\n".join([
+        f"""
+        DOCUMENT: {doc.metadata.get('source')}
+        CONTENT:
+        {doc.page_content}
+        """
+        for doc in docs
+    ])
+
+    # ✅ Strong prompt
     prompt = f"""
-    Answer based only on context.
-    If the answer is not in the context, say you don't know.
+        You are answering a question using multiple documents.
 
-    Context:
-    {context}
+        Carefully read ALL the context below.
 
-    Question: {message}
+        - Combine information from multiple chunks if needed
+        - If partial information exists, provide the most complete answer possible
+        - Only say "I don't know" if absolutely nothing relevant is found
+
+        Context:
+        {context}
+
+        Question: {message}
     """
 
-    # Get response from local LLM
+    print("\n--- CONTEXT PREVIEW ---")
+    print(context[:1000])
+    print("------------------------")
+    
     response = llm.invoke(prompt)
 
-    # Append user message and AI response to chat history
-    history.append((message, response))
+    # ✅ Show sources
+    sources = sorted(set(d.metadata.get("source") for d in docs))
+
+    response_with_sources = f"""{response}
+    Sources:
+    {chr(10).join(f"- {s}" for s in sources)}
+    """
+
+    history.append((message, response_with_sources))
     return history, history
 
 
-# ========== FILE UPLOAD FUNCTION ========
+# ========== FILE UPLOAD FUNCTION ==========
 def upload_and_ingest(files, progress=gr.Progress()):
-    """
-    Handle file upload and trigger ingestion into vector database.
-    Copies uploaded files to docs directory and processes them into embeddings.
-    
-    Args:
-        files (list): List of file paths uploaded by user
-    
-    Returns:
-        str: Success message with uploaded filenames and ingestion result
-    """
-    print("BEGINNING UPLOAD AND INGESTION PROCESS...")
-
-    # Track successfully uploaded files
     saved_files = []
 
-    # Process each uploaded file
     for file in files:
-        # Extract filename from file path
-        filename = os.path.basename(file)
-
-        # Define destination path in docs directory
+        filepath = str(file)
+        filename = os.path.basename(filepath)
         dest_path = os.path.join(DOCS_PATH, filename)
 
-        # Copy file to docs directory
-        shutil.copy(file, dest_path)
-
-        # Record filename
+        shutil.copy(filepath, dest_path)
         saved_files.append(filename)
 
-    # Progress-aware ingestion
+    # ✅ Only ingest new files
+    documents = load_documents(saved_files)
+
     def update_progress(p, msg):
         progress(p, desc=msg)
-    
-    # Trigger ingestion process to embed documents into vector store
-    result = ingest(progress_callback=update_progress)
+
+    result = ingest_documents(documents, update_progress)
 
     return f"Uploaded: {saved_files}\n\n{result}"
 
-# ========== VIEW FUNCTIONS ========
-# Functions to view ingested documents files for debugging and transparency in the UI
-# Files can be uploaded but not ingested if they are in an unsupported format, so this helps users understand what data is available for retrieval
+
+# ========== VIEW FUNCTIONS ==========
+
+# Show files actually ingested (from DB metadata)
 def view_ingested_docs():
     print("FETCHING INGESTED DOCUMENTS...")
     db = load_db()
@@ -121,21 +124,27 @@ def view_ingested_docs():
         if meta and "source" in meta:
             sources.add(meta["source"])
 
-    return "\n".join(sorted(sources))
+    return "\n".join(sorted(sources)) if sources else "No documents ingested."
 
-# View uploaded files in the docs directory
+
+# Show raw uploaded files
 def view_uploaded_files():
     print("FETCHING UPLOADED FILES...")
     files = os.listdir(DOCS_PATH)
+
+    if not files:
+        return "No files uploaded."
+
     return "\n".join([f"{i+1}. {file}" for i, file in enumerate(files)])
 
-# -------- UI --------
+
+# ========== UI ==========
 with gr.Blocks() as app:
-    gr.Markdown("# Local RAG App")
+    gr.Markdown("# 🚀 Local RAG App")
 
     with gr.Tabs():
 
-        # TAB 1 — CHAT
+        # ---------- CHAT ----------
         with gr.Tab("Chat"):
             chatbot = gr.Chatbot()
             msg = gr.Textbox(placeholder="Ask something...")
@@ -144,7 +153,7 @@ with gr.Blocks() as app:
             msg.submit(chat_fn, [msg, chatbot], [chatbot, chatbot])
             clear.click(lambda: [], None, chatbot)
 
-        # TAB 2 — UPLOAD
+        # ---------- UPLOAD ----------
         with gr.Tab("Upload & Ingest"):
             file_upload = gr.File(file_count="multiple")
             upload_btn = gr.Button("Upload & Ingest")
@@ -156,24 +165,25 @@ with gr.Blocks() as app:
                 outputs=output
             )
 
-        # TAB 3 — VIEW INGESTED DOCS
+        # ---------- VIEW INGESTED ----------
         with gr.Tab("View Ingested Files"):
-            btn = gr.Button("Show Ingested Data")
-            out = gr.Textbox(lines=20)
+            btn_ingested = gr.Button("Show Ingested Files")
+            out_ingested = gr.Textbox(lines=20)
 
-            btn.click(view_ingested_docs, None, out)
+            btn_ingested.click(view_ingested_docs, None, out_ingested)
 
-        # TAB 4 — VIEW UPLOADED FILES
-        with gr.Tab("View Files Uploaded"):
-            btn = gr.Button("Show Uploaded Files")
-            out = gr.Textbox(lines=20)
+        # ---------- VIEW UPLOADED ----------
+        with gr.Tab("View Uploaded Files"):
+            btn_uploaded = gr.Button("Show Uploaded Files")
+            out_uploaded = gr.Textbox(lines=20)
 
-            btn.click(view_uploaded_files, None, out)
+            btn_uploaded.click(view_uploaded_files, None, out_uploaded)
 
-# Launch the Gradio app on all network interfaces (important for Docker) and share it publicly
+
+# ========== APP ENTRY ==========
 if __name__ == "__main__":
     app.launch(
-    server_name="0.0.0.0",
-    server_port=7860,
-    share=True   # important for Docker environment
-)
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=True # Important for Docker implementation to allow external access
+    )

@@ -1,3 +1,4 @@
+import os
 from langchain_community.vectorstores import Chroma
 from src.embedding import embedding
 from src.constants import DB_PATH, DEFAULT_EMBEDDING_MODEL  # Vector database for embeddings
@@ -17,24 +18,34 @@ def load_db(db_path=DB_PATH, embedding_model=DEFAULT_EMBEDDING_MODEL):
 
 # ========== DATABASE STORER ==========
 def store_db(docs, embedding_model=DEFAULT_EMBEDDING_MODEL, db_path=DB_PATH):
-    """
-    Persist the Chroma vector database to disk.
-    Ensures that all embeddings and indexed documents are saved for future retrieval.
-    """
     if docs is None or len(docs) == 0:
         print("No documents to store in the database.")
         return
     
     print(f"Storing {len(docs)} documents in the database...")
     print(f"Using {embedding_model} for embeddings...")
-    db = Chroma.from_documents(
-        docs,
-        embedding(embedding_model),
-        persist_directory=db_path
-    )
+
+    embed = embedding(embedding_model)
+
+    # Check if DB already exists
+    if os.path.exists(db_path):
+        print("Loading existing database...")
+        db = Chroma(
+            persist_directory=db_path,
+            embedding_function=embed
+        )
+
+        db.add_documents(docs)
+    else:
+        print("Creating new database...")
+        db = Chroma.from_documents(
+            docs,
+            embed,
+            persist_directory=db_path
+        )
 
     db.persist()
-    print(f"Database stored at {db_path} with {len(docs)} documents.")
+    print(f"Database stored at {db_path}")
 
 # ========= DATABASE INSPECTOR (FOR DEBUGGING) ==========
 def inspect_db(embedding_model=DEFAULT_EMBEDDING_MODEL, db_path=DB_PATH):
