@@ -1,6 +1,6 @@
 from langchain_community.vectorstores import Chroma
 from src.embedding import embedding
-from src.constants import DB_PATH, DOCS_PATH, DEFAULT_EMBEDDING_MODEL  # Vector database for embeddings
+from src.constants import DB_PATH, DEFAULT_EMBEDDING_MODEL  # Vector database for embeddings
 
 # ========== DATABASE LOADER ==========
 def load_db(db_path=DB_PATH, embedding_model=DEFAULT_EMBEDDING_MODEL):
@@ -13,6 +13,7 @@ def load_db(db_path=DB_PATH, embedding_model=DEFAULT_EMBEDDING_MODEL):
         embedding_function=embedding(embedding_model) # Uses MiniLM-L6-v2: lightweight but effective for semantic similarity
     )
 
+# ========== DATABASE STORER ==========
 def store_db(docs, embedding_model=DEFAULT_EMBEDDING_MODEL, db_path=DB_PATH):
     """
     Persist the Chroma vector database to disk.
@@ -31,3 +32,19 @@ def store_db(docs, embedding_model=DEFAULT_EMBEDDING_MODEL, db_path=DB_PATH):
 
     db.persist()
     print(f"Database stored at {db_path} with {len(docs)} documents.")
+
+# ========= DATABASE INSPECTOR (FOR DEBUGGING) ==========
+def inspect_db(embedding_model=DEFAULT_EMBEDDING_MODEL, db_path=DB_PATH):
+    db = Chroma(
+        persist_directory=db_path,
+        embedding_function=embedding(embedding_model)
+    )
+
+    data = db.get()
+
+    print(f"Total chunks: {len(data['documents'])}")
+
+    for i in range(min(5, len(data['documents']))):
+        print("\n--- Chunk ---")
+        print("Text:", data['documents'][i][:200])
+        print("Metadata:", data['metadatas'][i])

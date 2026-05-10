@@ -43,6 +43,7 @@ def chat_fn(message, history):
 
     # Retrieve top 3 most similar documents to the user's query
     docs = db.similarity_search(message, k=3)
+
     # Combine retrieved documents into a single context string
     context = "\n\n".join([doc.page_content for doc in docs])
 
@@ -77,7 +78,8 @@ def upload_and_ingest(files, progress=gr.Progress()):
     Returns:
         str: Success message with uploaded filenames and ingestion result
     """
-    print("DEBUG: NEW VERSION RUNNING")
+    print("BEGINNING UPLOAD AND INGESTION PROCESS...")
+
     # Track successfully uploaded files
     saved_files = []
 
@@ -85,6 +87,7 @@ def upload_and_ingest(files, progress=gr.Progress()):
     for file in files:
         # Extract filename from file path
         filename = os.path.basename(file)
+
         # Define destination path in docs directory
         dest_path = os.path.join(DOCS_PATH, filename)
 
@@ -103,6 +106,25 @@ def upload_and_ingest(files, progress=gr.Progress()):
 
     return f"Uploaded: {saved_files}\n\n{result}"
 
+# ========== VIEW FUNCTIONS ========
+# Functions to view ingested documents files for debugging and transparency in the UI
+# Files can be uploaded but not ingested if they are in an unsupported format, so this helps users understand what data is available for retrieval
+def view_ingested_docs():
+    db = load_db()
+    data = db.get()
+
+    sources = set()
+
+    for meta in data["metadatas"]:
+        if meta and "source" in meta:
+            sources.add(meta["source"])
+
+    return "\n".join(sorted(sources))
+
+# View uploaded files in the docs directory
+def view_uploaded_files():
+    files = os.listdir(DOCS_PATH)
+    return "\n".join([f"{i+1}. {file}" for i, file in enumerate(files)])
 
 # -------- UI --------
 with gr.Blocks() as app:
@@ -131,10 +153,24 @@ with gr.Blocks() as app:
                 outputs=output
             )
 
+        # TAB 3 — VIEW INGESTED DOCS
+        with gr.Tab("View Ingested Files"):
+            btn = gr.Button("Show Ingested Data")
+            out = gr.Textbox(lines=20)
 
+            btn.click(view_ingested_docs, None, out)
+
+        # TAB 4 — VIEW UPLOADED FILES
+        with gr.Tab("View Files Uploaded"):
+            btn = gr.Button("Show Uploaded Files")
+            out = gr.Textbox(lines=20)
+
+            btn.click(view_uploaded_files, None, out)
+
+# Launch the Gradio app on all network interfaces (important for Docker) and share it publicly
 if __name__ == "__main__":
     app.launch(
     server_name="0.0.0.0",
     server_port=7860,
-    share=True   # important for Docker env
+    share=True   # important for Docker environment
 )

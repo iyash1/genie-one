@@ -143,6 +143,11 @@ A helper script exists at `scripts/reset.sh` that:
 
 Use with caution — it deletes local DB and prunes Docker resources.
 
+## Check the ingested documents (after the container is up and running)
+```bash
+docker compose exec app ls /app/docs
+```
+
 ---
 
 ## Configuration & Customization ⚙️
